@@ -5,7 +5,6 @@ from vector import Vector, Matrix, Quaternion, TranslationMatrix, ScaleMatrix
 
 import cv2
 import numpy as np
-import math
 
 width = 512
 height = 512
@@ -15,7 +14,6 @@ near = -1
 far = -3
 
 # Init z-buffer
-# zBuffer = [-float('inf')] * width * height
 zBuffer = np.full(width * height, -float('inf'))
 
 # Perspective Matrix
@@ -54,19 +52,8 @@ Tfin = Tvp * Tst
 model = Model('data/headset.obj')
 model.normalizeGeometry()
 
-def getOrthographicProjection(x, y, z):
-	# Convert vertex from world space to screen space
-	# by dropping the z-coordinate (Orthographic projection)
-	# x and y in range [-1,1]
-	# screenX and screenY in range [0,width], [0,height]
-	screenX = int((x+1.0)*width/2.0)
-	screenY = int((y+1.0)*height/2.0)
-
-	return screenX, screenY
-
+# Converts a point to screen space with perspective
 def getPerspectiveProjection(p):
-	# Converts a point to screen space with perspective
-
 	# Apply perspective matrix
 	screenP = Tp * p
 
@@ -80,12 +67,10 @@ def getPerspectiveProjection(p):
 	# Extract screen points
 	screenX, screenY = screenP.x, screenP.y
 
-	# Possibly replace rounding here to something more intelligent
-	# return int(screenX), int(screenY)
 	return Vector(screenX, screenY, p.z)
 
+# Compute vertex normals by averaging the normals of adjacent faces
 def getVertexNormal(vertIndex, adjFaces, faceNormals):
-	# Compute vertex normals by averaging the normals of adjacent faces
 	normal = Vector(0, 0, 0)
 	for faceInd in adjFaces[vertIndex]:
 		adjNormal = faceNormals[faceInd]
@@ -148,7 +133,7 @@ while True:
 
 		faceNormals[i] = faceNormal
 
-	# Calculate vertex normals
+	# Calculate vertex normals and projections
 	for vertIndex in range(len(transformedVerts)):
 
 		# If all the faces this vertex is connected to are to be culled, don't process this vertex
@@ -176,27 +161,14 @@ while True:
 
 		face = model.faces[i]
 
-		# p0, p1, p2 = [transformedVerts[i] for i in face]
-		# n0, n1, n2 = [vertexNormals[i] for i in face]
-
-		# Transform vertices and calculate lighting intensity per vertex
-		# transformedPoints = []
-		# # for p, n in zip([p0, p1, p2], [n0, n1, n2]):
-		# for j in face:
-		# 	intensity = vertexIntensities[j]
-		# 	p = transformedVerts[j]
-				
-		# 	# screenX, screenY = getOrthographicProjection(p.x, p.y, p.z)
-		# 	transformedPoints.append(Point(p.x, p.y, p.z, Color(intensity*255, intensity*255, intensity*255, 255)))
-
-		# Triangle(transformedPoints[0], transformedPoints[1], transformedPoints[2]).draw_faster(image, zBuffer)
 		Triangle(transformedVerts[face[0]], transformedVerts[face[1]], transformedVerts[face[2]]).draw_faster(image, zBuffer)
 
 	cv2.imshow("render", image.convertToNumpy())
-	# image = Image(width, height, Color(200, 200, 200, 255))
+
 	image.fill(Color(200, 200, 200, 255))
 	zBuffer.fill(-float('inf'))
 
+	# Close program if 'Q' is pressed
 	if cv2.waitKey(1) & 0xFF == ord('q'):
 		break
 

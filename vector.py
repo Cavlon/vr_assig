@@ -1,19 +1,13 @@
-import math
 import numbers
 import numpy as np
 
 class Vector(object):
     """ A vector with useful vector / matrix operations.
     """
-    def __init__(self, *args):
-        # if len(args == 0):
-        #     self.components = [0, 0, 0, 0]
-            
-        # else:
-        #     self.components = [arg for arg in args]
-        #     if len(args) == 3:
-        #         self.components.append(1)
-        
+    def __init__(self, *args):     
+
+        # IMPLEMENT VECTOR FROM QUATERNION
+
         self.components = np.zeros(4)
            
         for i in range(len(args)):
@@ -64,25 +58,19 @@ class Vector(object):
         """ Return the norm (magnitude) of this vector."""
         return np.linalg.norm(self.components[:-1])
 
-        # squaredComponents = sum(math.pow(comp, 2) for comp in self.components[:-1])
-        # return math.sqrt(squaredComponents)
-
     def normalize(self):
         """ Return a normalized unit vector from this vector."""
         magnitude = self.norm()
-        # return Vector(*[comp/magnitude for comp in self.components[:-1]])
         return Vector(*(self.components[:-1] / magnitude))
 
     def dot(self, other):
         """ Return the dot product of this and another vector."""
-        # return sum(a * b for a, b in zip(self.components[:-1], other.components[:-1]))
         return np.dot(self.components[:-1], other.components[:-1])
 
     def cross(self, other):
         """ Return the cross product of this and another vector."""
         assert len(self) == len(other), "Vectors must be the same size."
         assert len(self.components[:-1]) == 3, "Cross product only implemented for 3D vectors."
-        # return Vector((self.y*other.z - self.z*other.y), (self.z*other.x - self.x*other.z), (self.x*other.y - self.y*other.x))
         return Vector(*np.cross(self.components[:-1], other.components[:-1]))
 
 
@@ -94,24 +82,16 @@ class Vector(object):
         if type(other) == type(self):
             return self.dot(other)
         elif isinstance(other, numbers.Real):
-            # product = tuple(comp * other for comp in self)
-            # return Vector(*product)
             return Vector(*(self.components * other))
 
     def __truediv__(self, other):
         if isinstance(other, numbers.Real):
-            # value = tuple(comp / other for comp in self)
-            # return Vector(*value)
             return Vector(*(self.components / other))
     
     def __add__(self, other):
-        # value = tuple(a + b for a, b in zip(self, other))
-        # return Vector(*value)
         return Vector(*(self.components + other.components))
     
     def __sub__(self, other):
-        # value = tuple(a - b for a, b in zip(self, other))
-        # return Vector(*value)
         return Vector(*(self.components - other.components))
 
     def __len__(self):
@@ -175,22 +155,26 @@ class Quaternion(Vector):
 
         # Convert Vector to quaternion
         if len(args) == 1:
+
+            # IMPLEMENT AXIS AND ANGLE COMPUTATION
+
             self.components[0] = 0
             self.components[1] = args[0].x
             self.components[2] = args[0].y
             self.components[3] = args[0].z
         # Create quaternion from 4 components
         elif len(args) == 4:
+
+            # IMPLEMENT AXIS AND ANGLE COMPUTATION
+
             self.components[0] = args[0]
             self.components[1] = args[1]
             self.components[2] = args[2]
             self.components[3] = args[3]
+        # Create quaternion from angle and axis
         else:
-
             self.angle = args[0]
             self.a = args[1]
-
-            # print(self.angle)
 
             self.components[0] = np.cos(self.angle/2)
 
@@ -203,11 +187,8 @@ class Quaternion(Vector):
         return Quaternion(self.angle, self.a * -1)
     
     def __mul__(self, other):
-        """ If multiplied by another vector, return the dot product. 
-            If multiplied by a number, multiply each component by other.
-        """
-        if type(other) == type(self):
-            
+        # Quaternion multiplication
+        if type(other) == type(self):       
             return Quaternion(
                 self.x * other.x - self.y * other.y - self.z * other.z - self.w * other.w,
                 self.x * other.y + other.x * self.y + self.z * other.w - other.z * self.w,

@@ -83,8 +83,6 @@ class Image(object):
 		# Blend the new color with the destination color
 		outColor = color.getAlphaBlend(destColor)
 
-		# print(color.getTuple())
-
 		# Set the new pixel colors in the buffer
 		self.buffer[index + 1 : index + 5] = outColor.getTuple()
 
