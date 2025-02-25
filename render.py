@@ -2,6 +2,7 @@ from image import Image, Color
 from model import Model
 from shape import Point, Line, Triangle
 from vector import Vector, Matrix, Quaternion, TranslationMatrix, ScaleMatrix
+from track import Data
 
 import cv2
 import numpy as np
@@ -9,6 +10,8 @@ import numpy as np
 width = 512
 height = 512
 image = Image(width, height, Color(200, 200, 200, 255))
+
+data = Data("IMUData.csv")
 
 near = -1
 far = -3
@@ -163,7 +166,7 @@ while True:
 
 		Triangle(transformedVerts[face[0]], transformedVerts[face[1]], transformedVerts[face[2]]).draw_faster(image, zBuffer)
 
-	cv2.imshow("render", image.convertToNumpy())
+	cv2.imshow("render", image.buffer)
 
 	image.fill(Color(200, 200, 200, 255))
 	zBuffer.fill(-float('inf'))

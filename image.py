@@ -9,6 +9,7 @@
 
 import zlib, struct
 import numpy as np
+import cv2
 
 class Color(object):
 	""" A small class representing a 32-bit RGBA color."""
@@ -58,15 +59,11 @@ class Image(object):
 		self.width = width
 		self.height = height
 
-		# Each row consists of a null byte followed by colors for each pixel
-		row = bytearray(1) + bytearray([color.r(), color.g(), color.b(), color.a()] * width)
-		self.buffer = row * height
+		self.buffer = np.zeros((height, width, 4), dtype=np.uint8)
+		self.fill(color)
 	
 	def fill(self, color):
-		pixel = [color.r(), color.g(), color.b(), color.a()]  # RGBA values
-		for y in range(self.height):
-			start = y * (1 + self.width * 4)  # Each row starts with a null byte
-			self.buffer[start + 1 : start + 1 + self.width * 4] = pixel * self.width
+		self.buffer[:] = color.getTuple()
 
 	def setPixel(self, x, y, color):
 		""" Set the color value for the pixel at (x, y)."""
@@ -74,63 +71,13 @@ class Image(object):
 			return
 
 		# Flip Y coordinate so that up is positive
-		flipY = (self.height - y - 1)
-		index = (flipY * self.width + x) * 4 + flipY
+		pixel = self.buffer[-y, x]
 
-		# Get the existing destination color
-		destColor = Color(*tuple(self.buffer[index + 1 : index + 5]))
-
-		# Blend the new color with the destination color
-		outColor = color.getAlphaBlend(destColor)
+		# # Blend the new color with the destination color
+		outColor = color.getAlphaBlend(Color(*pixel)).getTuple()
 
 		# Set the new pixel colors in the buffer
-		self.buffer[index + 1 : index + 5] = outColor.getTuple()
+		self.buffer[-y, x, :] = outColor
 
 	def saveAsPNG(self, filename = "render.png"):
-		""" Pack a new buffer formatted as a PNG, then save it to a file."""
-		print("Saving PNG...")
-
-		def makeChunk(chunkType, chunkData):
-			""" Pack data into standard PNG chunks. Chunks consist of:
-					- a 4-byte length 
-					- a 4-byte chunk type 
-					- the chunk data (compressed)
-					- a 4-byte cyclic redundancy check value (CRC)
-			"""
-			chunk = struct.pack(">I", len(chunkData)) + \
-					chunkType + \
-					chunkData +	\
-					struct.pack(">I", 0xFFFFFFFF & zlib.crc32(chunkType + chunkData))
-
-			return chunk
-
-		# Compose the PNG out of 3 chunks using the above function:
-		#	- IHDR: Header containing image size, color depth, existence of alpha channel etc. (See PNG spec)
-		#	- IDAT: Chunk containing the actual image data
-		#	- IEND: End-of-image chunk
-
-		# Start with the universal PNG signature identifying the file as a PNG, then append chunks
-		packedData = b'\x89PNG\r\n\x1a\n' +	\
-					 makeChunk(b'IHDR', struct.pack(">2I5B", self.width, self.height, 8, 6, 0, 0, 0)) + \
-					 makeChunk(b'IDAT', zlib.compress(self.buffer, 9)) + \
-					 makeChunk(b'IEND', b'')
-
-		png = open(filename, 'wb')
-		png.write(packedData)
-		png.close()
-	
-
-	def convertToNumpy(self):
-		# Convert buffer to numpy array
-		np_buffer = np.frombuffer(self.buffer, dtype=np.uint8)
-
-		# Each row has width * 4 + 1 bytes, each pixel has 4 channels and there is an extra null byte
-		np_buffer = np_buffer.reshape((self.height, self.width * 4 + 1))
-
-		# Remove the first null byte
-		np_buffer = np_buffer[:, 1:]
-
-		# Without the null byte, it can evenly fit height*width with 4 channels
-		np_buffer = np_buffer.reshape((self.height, self.width, 4))
-
-		return np_buffer
+		cv2.imwrite(filename, self.buffer)
