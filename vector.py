@@ -1,20 +1,25 @@
 import numbers
 import numpy as np
+import math
 
 class Vector(object):
     """ A vector with useful vector / matrix operations.
     """
     def __init__(self, *args):     
 
-        # IMPLEMENT VECTOR FROM QUATERNION
-
         self.components = np.zeros(4)
-           
-        for i in range(len(args)):
-            self.components[i] = args[i]
-        
-        if len(args) == 3:
+
+        if isinstance(args[0], Quaternion):
+            self.components[0] = args[0].y
+            self.components[1] = args[0].z
+            self.components[2] = args[0].w
             self.components[3] = 1
+        else:        
+            for i in range(len(args)):
+                self.components[i] = args[i]
+            
+            if len(args) == 3:
+                self.components[3] = 1
         
         
 
@@ -153,38 +158,111 @@ class Quaternion(Vector):
     def __init__(self, *args):
         self.components = np.zeros(4)
 
-        # Convert Vector to quaternion
+        # Convert vector to quaternion
         if len(args) == 1:
-
-            # IMPLEMENT AXIS AND ANGLE COMPUTATION
 
             self.components[0] = 0
             self.components[1] = args[0].x
             self.components[2] = args[0].y
             self.components[3] = args[0].z
+
+            self.angle, self.axis = self.getAxisAngle()
+        
+        # Create quaternion from angle and axis
+        elif len(args) == 2:
+
+            self.angle = args[0]
+            self.axis = args[1]
+
+            self.components[0] = math.cos(self.angle/2)
+
+            sinangle = math.sin(self.angle/2)
+            self.components[1] = self.axis.x * sinangle
+            self.components[2] = self.axis.y * sinangle
+            self.components[3] = self.axis.z * sinangle
+        
+        # Create quaternion from Euler angles
+        elif len(args) == 3:
+
+            pitch = args[0] / 2 # x is pitch
+            yaw = args[1] / 2   # y is yaw
+            roll = args[2] / 2  # z is roll
+
+            # From Wikipedia formulae
+            cp = math.cos(pitch)
+            sp = math.sin(pitch)
+            cy = math.cos(yaw)
+            sy = math.sin(yaw)
+            cr = math.cos(roll)
+            sr = math.sin(roll)
+
+            self.components[0] = cr * cp * cy + sr * sp * sy
+            self.components[1] = cr * sp * cy + sr * cp * sy
+            self.components[2] = cr * cp * sy - sr * sp * cy
+            self.components[3] = sr * cp * cy - cr * sp * sy
+
+            self.angle, self.axis = self.getAxisAngle()
+
         # Create quaternion from 4 components
         elif len(args) == 4:
-
-            # IMPLEMENT AXIS AND ANGLE COMPUTATION
 
             self.components[0] = args[0]
             self.components[1] = args[1]
             self.components[2] = args[2]
-            self.components[3] = args[3]
-        # Create quaternion from angle and axis
-        else:
-            self.angle = args[0]
-            self.a = args[1]
+            self.components[3] = args[3]    
 
-            self.components[0] = np.cos(self.angle/2)
-
-            sinangle = np.sin(self.angle/2)
-            self.components[1] = self.a.x * sinangle
-            self.components[2] = self.a.y * sinangle
-            self.components[3] = self.a.z * sinangle
+            self.angle, self.axis = self.getAxisAngle()        
     
+    def getAxisAngle(self):
+        angle = 2 * math.acos(self.components[0])
+        scalar = 1/math.sqrt(1-(self.components[0] * self.components[0]))
+        axis = Vector(self.components[1] * scalar, self.components[2] * scalar, self.components[3] * scalar)
+
+        return angle, axis
+    
+    # From Wikipedia formulae
+    def toEuler(self):
+
+        def clamp(val, low, high):
+            if val < low:
+                val = low
+            elif val > high:
+                return high
+            else:
+                return val
+        
+        def fpCorrection(val):
+            if abs(val) < 1e-10:
+                return 0
+            else:
+                return val
+
+        wx = self.components[0] * self.components[1]
+        wy = self.components[0] * self.components[2]
+        wz = self.components[0] * self.components[3]
+
+        x2 = self.components[1] * self.components[1]
+
+        p = clamp(2 * (wx - (self.components[2] * self.components[3])), -1, 1)
+        y1 = 2 * (wy + (self.components[1] * self.components[3]))
+        y2 = 1 - 2 * (x2 + (self.components[2] * self.components[2]))
+        r1 = 2 * (wz + (self.components[1] * self.components[2]))
+        r2 = 1 - 2 * (x2 + (self.components[3] * self.components[3]))
+
+        p = fpCorrection(p)
+        y1 = fpCorrection(y1)
+        y2 = fpCorrection(y2)
+        r1 = fpCorrection(r1)
+        r2 = fpCorrection(r2)
+
+        pitch = math.asin(p)
+        yaw = math.atan2(y1, y2)
+        roll = math.atan2(r1, r2)
+
+        return pitch, yaw, roll
+
     def inv(self):
-        return Quaternion(self.angle, self.a * -1)
+        return Quaternion(self.angle, self.axis * -1)
     
     def __mul__(self, other):
         # Quaternion multiplication

@@ -115,7 +115,7 @@ while True:
 
 	for i in range(len(transformedVerts)):
 		transformedVerts[i] = q * Quaternion(model.vertices[i]) * qi
-		transformedVerts[i] = Vector(transformedVerts[i].y, transformedVerts[i].z, transformedVerts[i].w)
+		transformedVerts[i] = Vector(transformedVerts[i])
 		transformedVerts[i] = mat * transformedVerts[i]
 
 	# A set of indicies for faces to cull
