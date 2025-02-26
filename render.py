@@ -6,18 +6,23 @@ from track import Data
 
 import cv2
 import numpy as np
+import math
 
 width = 512
 height = 512
 image = Image(width, height, Color(200, 200, 200, 255))
 
 data = Data("IMUData.csv")
+data_size = data.data.shape[0] - 1
 
 near = -1
 far = -3
 
 # Init z-buffer
 zBuffer = np.full(width * height, -float('inf'))
+
+t = 1
+time = 0
 
 # Perspective Matrix
 Tp = Matrix(np.array(
@@ -85,9 +90,11 @@ translation = TranslationMatrix(Vector(0, -0.5, -2))
 scale = ScaleMatrix(Vector(1, 1, 1))
 mat = translation * scale
 
-angle = 0
-
 transformedVerts = [0] * len(model.vertices)
+
+vertQuaternions = []
+for i in range(len(model.vertices)):
+	vertQuaternions.append(Quaternion(model.vertices[i]))
 
 # Define the light direction
 lightDir = Vector(0, 0, -1)
@@ -104,17 +111,43 @@ for i in range(len(model.faces)):
 		# Add this face's normal to this vertex index's normal list
 		adjFaces[j].append(i)
 
+orientation = Quaternion(1, 0, 0, 0)
+trueUp = Vector(0, 1, 0)
+
+alpha = 0.0001
+
 while True:
 
-	q = Quaternion(angle, Vector(0, 1, 0))
-	qi = q.inv()
+	print(t)
 
-	angle -= 0.05
-	if angle < -2 * np.pi:
-		angle += 2 * np.pi
+	angVel = data.getRot(t)
+	angVel = Vector(*angVel)
+	angVel = Quaternion(angVel.norm(), angVel)
+
+	currentTime = data.getTime(t)
+	
+	orientationDelta = (orientation * 0.5) * angVel
+	orientation = orientation + (orientationDelta * (currentTime - time))
+	orientation = orientation.normalize()
+
+	up = data.getAcc(t)
+	up = Vector(*up)
+
+	# CHECK IF ACCELERATION IS TOO HIGH TO BE VALID
+
+	up = up.normalize()
+	phi = math.acos(trueUp.dot(up))
+	tiltAxis = Vector(up.z, 0, -up.x).normalize()
+	driftQuaternion = Quaternion(phi * alpha, tiltAxis)
+
+	orientation = driftQuaternion * orientation
+
+	time = currentTime
+
+	orientationInv = orientation.inv()
 
 	for i in range(len(transformedVerts)):
-		transformedVerts[i] = q * Quaternion(model.vertices[i]) * qi
+		transformedVerts[i] = orientation * vertQuaternions[i] * orientationInv
 		transformedVerts[i] = Vector(transformedVerts[i])
 		transformedVerts[i] = mat * transformedVerts[i]
 
@@ -173,6 +206,11 @@ while True:
 
 	# Close program if 'Q' is pressed
 	if cv2.waitKey(1) & 0xFF == ord('q'):
+		break
+
+	t += 1
+
+	if t > data_size:
 		break
 
 cv2.destroyAllWindows()

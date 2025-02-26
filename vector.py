@@ -2,6 +2,14 @@ import numbers
 import numpy as np
 import math
 
+def clamp(val, low, high):
+    if val < low:
+        return low
+    elif val > high:
+        return high
+    else:
+        return val
+
 class Vector(object):
     """ A vector with useful vector / matrix operations.
     """
@@ -214,22 +222,21 @@ class Quaternion(Vector):
             self.angle, self.axis = self.getAxisAngle()        
     
     def getAxisAngle(self):
-        angle = 2 * math.acos(self.components[0])
-        scalar = 1/math.sqrt(1-(self.components[0] * self.components[0]))
-        axis = Vector(self.components[1] * scalar, self.components[2] * scalar, self.components[3] * scalar)
+        
+        angle = clamp(self.components[0], -1, 1)
+
+        angle = 2 * math.acos(angle)
+
+        if angle == 0:
+            return 0, Vector(0, 0, 0)
+        
+        scalar = 1/math.sin(angle/2)
+        axis = Vector(*self.components[1:]) * scalar
 
         return angle, axis
     
     # From Wikipedia formulae
     def toEuler(self):
-
-        def clamp(val, low, high):
-            if val < low:
-                val = low
-            elif val > high:
-                return high
-            else:
-                return val
         
         def fpCorrection(val):
             if abs(val) < 1e-10:
@@ -264,6 +271,15 @@ class Quaternion(Vector):
     def inv(self):
         return Quaternion(self.angle, self.axis * -1)
     
+    def norm(self):
+        """ Return the norm (magnitude) of this vector."""
+        return np.linalg.norm(self.components)
+
+    def normalize(self):
+        """ Return a normalized unit vector from this vector."""
+        magnitude = self.norm()
+        return Quaternion(*(self.components / magnitude))
+    
     def __mul__(self, other):
         # Quaternion multiplication
         if type(other) == type(self):       
@@ -273,3 +289,9 @@ class Quaternion(Vector):
                 self.x * other.z + other.x * self.z + other.y * self.w - self.y * other.w,
                 self.x * other.w + other.x * self.w + self.y * other.z - other.y * self.z
             )
+        elif isinstance(other, numbers.Real):
+            return Quaternion(*(self.components * other))
+    
+    def __add__(self, other):
+        if type(other) == type(self):       
+            return Quaternion(*(self.components + other.components))
