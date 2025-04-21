@@ -11,8 +11,7 @@ def clamp(val, low, high):
         return val
 
 class Vector(object):
-    """ A vector with useful vector / matrix operations.
-    """
+    """ A vector with useful vector / matrix operations. """
     def __init__(self, *args):     
 
         self.components = np.zeros(4)
@@ -115,25 +114,29 @@ class Vector(object):
 
 class Matrix(object):
     def __init__(self, *args):
+        """ Initialise a matrix as a 2D numpy array"""
         if len(args) == 0:
             self.components = np.eye(4)
         else:
             self.components = args[0]
     
-    def __mul__(self, other):
-        """ If multiplied by another vector, return the dot product. 
-            If multiplied by a number, multiply each component by other.
-        """
-        
+    def __mul__(self, other):       
         if isinstance(other, Matrix):
+            """ Matrix multiplication"""
             return Matrix(self.components @ other.components)
         elif isinstance(other, Vector):
+            """ Vector-Matrix multiplication"""
             return Vector(*(self.components @ other.components))
         elif isinstance(other, numbers.Real):
+            """ Scalar multiplication"""
             return Matrix(self.components * other)
 
 class TranslationMatrix(Matrix):
     def __init__(self, t):
+        """ Takes a vector t and creates a matrix
+            which translates all components of a vector by the corresponding t components
+        """
+
         self.t = t
         self.components = np.array(
             [
@@ -145,10 +148,15 @@ class TranslationMatrix(Matrix):
         )
     
     def inv(self):
+        """ Return inverse translation matrix"""
         return TranslationMatrix(self.t * -1)
 
 class ScaleMatrix(Matrix):
     def __init__(self, s):
+        """ Takes a scalar s and creates a matrix
+            which scales all components of a vector by s
+        """
+
         self.s = s
         self.components = np.array(
             [
@@ -160,14 +168,15 @@ class ScaleMatrix(Matrix):
         )
     
     def inv(self):
+        """ Return inverse scalar matrix"""
         ScaleMatrix(Vector(1/self.s.x, 1/self.s.y, 1/self.s.z))
 
 class Quaternion(Vector):
     def __init__(self, *args):
         self.components = np.zeros(4)
 
-        # Convert vector to quaternion
         if len(args) == 1:
+            """ Create quaternion from vector """
 
             self.components[0] = 0
             self.components[1] = args[0].x
@@ -176,9 +185,9 @@ class Quaternion(Vector):
 
             self.angle, self.axis = self.getAxisAngle()
         
-        # Create quaternion from angle and axis
         elif len(args) == 2:
-
+            """ Create quaternion from angle and axis """
+            
             self.angle = args[0]
             self.axis = args[1]
 
@@ -189,8 +198,8 @@ class Quaternion(Vector):
             self.components[2] = self.axis.y * sinangle
             self.components[3] = self.axis.z * sinangle
         
-        # Create quaternion from Euler angles
         elif len(args) == 3:
+            """ Create quaternion from Euler angles """
 
             pitch = args[0] / 2 # x is pitch
             yaw = args[1] / 2   # y is yaw
@@ -211,8 +220,8 @@ class Quaternion(Vector):
 
             self.angle, self.axis = self.getAxisAngle()
 
-        # Create quaternion from 4 components
         elif len(args) == 4:
+            """ Create quaternion from 4 components """
 
             self.components[0] = args[0]
             self.components[1] = args[1]
@@ -222,6 +231,7 @@ class Quaternion(Vector):
             self.angle, self.axis = self.getAxisAngle()        
     
     def getAxisAngle(self):
+        """ Calculates and returns this quaternion's corresponding angle and axis """
         
         angle = clamp(self.components[0], -1, 1)
 
@@ -236,8 +246,10 @@ class Quaternion(Vector):
         return angle, axis
     
     # From Wikipedia formulae
-    def toEuler(self):
+    def getEuler(self):
+        """ Calculates and returns this quaternion's corresponding Euler angles """
         
+        # Account for floating point error
         def fpCorrection(val):
             if abs(val) < 1e-10:
                 return 0
@@ -269,29 +281,33 @@ class Quaternion(Vector):
         return pitch, yaw, roll
 
     def inv(self):
+        """ Return the inverse of this quaternion """
         return Quaternion(self.angle, self.axis * -1)
     
     def norm(self):
-        """ Return the norm (magnitude) of this vector."""
+        """ Return the norm (magnitude) of this quaternion"""
         return np.linalg.norm(self.components)
 
     def normalize(self):
-        """ Return a normalized unit vector from this vector."""
+        """ Return a normalized unit vector from this quaternion"""
         magnitude = self.norm()
         return Quaternion(*(self.components / magnitude))
     
     def __mul__(self, other):
-        # Quaternion multiplication
-        if type(other) == type(self):       
+        if type(other) == type(self):
+            """ Quaternion multiplication"""
             return Quaternion(
                 self.x * other.x - self.y * other.y - self.z * other.z - self.w * other.w,
                 self.x * other.y + other.x * self.y + self.z * other.w - other.z * self.w,
                 self.x * other.z + other.x * self.z + other.y * self.w - self.y * other.w,
                 self.x * other.w + other.x * self.w + self.y * other.z - other.y * self.z
             )
+        
         elif isinstance(other, numbers.Real):
+            """ Scalar multiplication"""  
             return Quaternion(*(self.components * other))
     
     def __add__(self, other):
-        if type(other) == type(self):       
+        if type(other) == type(self):
+            """ Quaternion addition"""
             return Quaternion(*(self.components + other.components))

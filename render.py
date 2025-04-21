@@ -60,8 +60,9 @@ Tfin = Tvp * Tst
 model = Model('data/headset.obj')
 model.normalizeGeometry()
 
-# Converts a point to screen space with perspective
 def getPerspectiveProjection(p):
+	""" Converts a point to screen space with perspective """
+
 	# Apply perspective matrix
 	screenP = Tp * p
 
@@ -77,8 +78,8 @@ def getPerspectiveProjection(p):
 
 	return Vector(screenX, screenY, p.z)
 
-# Compute vertex normals by averaging the normals of adjacent faces
 def getVertexNormal(vertIndex, adjFaces, faceNormals):
+	""" Compute vertex normals by averaging the normals of adjacent faces """
 	normal = Vector(0, 0, 0)
 	for faceInd in adjFaces[vertIndex]:
 		adjNormal = faceNormals[faceInd]
@@ -88,10 +89,11 @@ def getVertexNormal(vertIndex, adjFaces, faceNormals):
 
 translation = TranslationMatrix(Vector(0, -0.5, -2))
 scale = ScaleMatrix(Vector(1, 1, 1))
-mat = translation * scale
+Tmodel = translation * scale
 
 transformedVerts = [0] * len(model.vertices)
 
+# Turn all vertices into quaternions
 vertQuaternions = []
 for i in range(len(model.vertices)):
 	vertQuaternions.append(Quaternion(model.vertices[i]))
@@ -99,8 +101,10 @@ for i in range(len(model.vertices)):
 # Define the light direction
 lightDir = Vector(0, 0, -1)
 
+# A list to store all face normals by index
 faceNormals = [0] * len(model.faces)
 
+# A dictionary which maps vertices to each face it is connected to
 adjFaces = {}
 for i in range(len(model.faces)):
 	# foreach vertex index in the face
@@ -120,21 +124,25 @@ while True:
 
 	print(t)
 
+	# Read rotation data and get rotation as a quaternion
 	angVel = data.getRot(t)
 	angVel = Vector(*angVel)
 	angVel = Quaternion(angVel.norm(), angVel)
 
 	currentTime = data.getTime(t)
 	
+	# Apply the rotation
 	orientationDelta = (orientation * 0.5) * angVel
 	orientation = orientation + (orientationDelta * (currentTime - time))
 	orientation = orientation.normalize()
 
+	# Read accelerometer data for tilt correction
 	up = data.getAcc(t)
 	up = Vector(*up)
 
 	# CHECK IF ACCELERATION IS TOO HIGH TO BE VALID
 
+	# Apply tilt correction with parameter alpha
 	up = up.normalize()
 	phi = math.acos(trueUp.dot(up))
 	tiltAxis = Vector(up.z, 0, -up.x).normalize()
@@ -144,12 +152,12 @@ while True:
 
 	time = currentTime
 
+	# Apply orientation quarternions and model matrix to vertices
 	orientationInv = orientation.inv()
-
 	for i in range(len(transformedVerts)):
 		transformedVerts[i] = orientation * vertQuaternions[i] * orientationInv
 		transformedVerts[i] = Vector(transformedVerts[i])
-		transformedVerts[i] = mat * transformedVerts[i]
+		transformedVerts[i] = Tmodel * transformedVerts[i]
 
 	# A set of indicies for faces to cull
 	culledFaces = set()
@@ -157,9 +165,14 @@ while True:
 	# Calculate face normals
 	for i in range(len(model.faces)):
 		face = model.faces[i]
+
+		# Get the world coordinates for this face's vertices
 		p0, p1, p2 = [transformedVerts[j] for j in face]
+
+		# Calculate this face's normal
 		faceNormal = (p2-p0).cross(p1-p0).normalize()
 
+		# How much light should this face recieve
 		faceIntensity = faceNormal * lightDir
 
 		# Intensity < 0 means light is shining through the back of the face
@@ -178,14 +191,15 @@ while True:
 
 		vertNorm = getVertexNormal(vertIndex, adjFaces, faceNormals)
 
-		# Dot product of the vertex normal and light direction
+		# How much light does this vertex recieve
 		intensity = vertNorm * lightDir
 		
+		# Though this vertex isn't visible, its shading can affect the visible polygon
 		if intensity < 0:
 			intensity = 0
 		
+		# Get this vertex's screen point and colour
 		projectedVert = getPerspectiveProjection(transformedVerts[vertIndex])
-
 		transformedVerts[vertIndex] = Point(projectedVert.x, projectedVert.y, projectedVert.z, Color(intensity*255, intensity*255, intensity*255, 255))
 
 	# Render the image iterating through faces
@@ -201,6 +215,7 @@ while True:
 
 	cv2.imshow("render", image.buffer)
 
+	# Reset image and z buffers
 	image.fill(Color(200, 200, 200, 255))
 	zBuffer.fill(-float('inf'))
 
@@ -210,6 +225,7 @@ while True:
 
 	t += 1
 
+	# Stop if all input data has been read
 	if t > data_size:
 		break
 
