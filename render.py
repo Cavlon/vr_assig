@@ -118,6 +118,8 @@ for i in range(len(model.faces)):
 orientation = Quaternion(1, 0, 0, 0)
 trueUp = Vector(0, 1, 0)
 
+startFrom = 2600
+
 alpha = 0.0001
 
 while True:
@@ -127,33 +129,46 @@ while True:
 	# Read rotation data and get rotation as a quaternion
 	angVel = data.getRot(t)
 	angVel = Vector(*angVel)
-	angVel = Quaternion(angVel.norm(), angVel)
 
 	currentTime = data.getTime(t)
-	
-	# Apply the rotation
-	orientationDelta = (orientation * 0.5) * angVel
-	orientation = orientation + (orientationDelta * (currentTime - time))
+
+	# Apply orientation change
+	orientationDelta = Quaternion(angVel.norm() * (currentTime - time), angVel.normalize())
+	orientation = orientation * orientationDelta
 	orientation = orientation.normalize()
+
+	orientationInv = orientation.inv()
 
 	# Read accelerometer data for tilt correction
 	up = data.getAcc(t)
 	up = Vector(*up)
+	upNorm = up.norm()
 
-	# CHECK IF ACCELERATION IS TOO HIGH TO BE VALID
+	# Only apply drift correction if accelerometer is probably only measuring gravity
+	# In a default state, the norm is ~1 so deviations suggest external acceleration
+	if upNorm > 0.95 and upNorm < 1.05:
 
-	# Apply tilt correction with parameter alpha
-	up = up.normalize()
-	phi = math.acos(trueUp.dot(up))
-	tiltAxis = Vector(up.z, 0, -up.x).normalize()
-	driftQuaternion = Quaternion(phi * alpha, tiltAxis)
+		# Bring local 'up' reading into world space
+		up = Quaternion(up)
+		up = orientation * up * orientationInv
+		up = Vector(up)
 
-	orientation = driftQuaternion * orientation
+		# Apply tilt correction with parameter alpha
+		up = up.normalize()
+		phi = math.acos(trueUp.dot(up))
+		tiltAxis = Vector(up.z, 0, -up.x).normalize()
+		driftQuaternion = Quaternion(-phi * alpha, tiltAxis)
+
+		orientation = driftQuaternion * orientation
 
 	time = currentTime
 
+	# Skip rendering until a certain point
+	if t < startFrom:
+		t += 1
+		continue
+
 	# Apply orientation quarternions and model matrix to vertices
-	orientationInv = orientation.inv()
 	for i in range(len(transformedVerts)):
 		transformedVerts[i] = orientation * vertQuaternions[i] * orientationInv
 		transformedVerts[i] = Vector(transformedVerts[i])
