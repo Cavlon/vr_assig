@@ -134,7 +134,8 @@ def handleOrientation(orientation):
 
 	return orientation, orientationInv
 
-def physicsPass(models, positions, velocities, friction = 0.98, radius = 0.5):
+def physicsPass(models, positions, velocities, friction = 0.98, radius = 0.4):
+	""" Models basic distance-based physics """
 	new_velocities = copy.deepcopy(velocities)
 
 	for i in range(0, len(models)-2):
@@ -161,6 +162,33 @@ def physicsPass(models, positions, velocities, friction = 0.98, radius = 0.5):
 	for i in range(0, len(models)-2):
 		velocities[i] = new_velocities[i] * friction
 		positions[i] = positions[i] + new_velocities[i]
+
+def depthOfField(image, z_buffer, near_plane=-1.5, far_plane=-3, max_dist=2, max_blur=1.5, blur_kernel=7):
+	""" Applies depth-of-field to the screen image """
+
+	# Compute the max-blurred image
+	blurred_image = cv2.GaussianBlur(image.buffer, (blur_kernel, blur_kernel), max_blur)
+
+	# Scales a point's distance from a focal plane to [0, max_blur] for blur interpolation
+	blur_scalar = max_blur / max_dist
+
+	# Iterate through every pixel
+	for y in range(image.height):
+		for x in range(image.width):
+			blur_amount = 0
+
+			# Calculate how much blur to add based on depth distance away from the focal region
+			if z_buffer[y * image.width + x] > near_plane:
+				blur_dist = min(max_dist, z_buffer[y * image.width + x] - near_plane)
+				blur_amount = blur_dist * blur_scalar
+			elif z_buffer[y * image.width + x] < far_plane:
+				blur_dist = min(max_dist, far_plane - z_buffer[y * image.width + x])
+				blur_amount = blur_dist * blur_scalar
+			else:
+				continue
+
+			# Update the pixel's colour as a weighted average using the blur amount as the weight
+			image.buffer[-y, x] = blur_amount * blurred_image[-y, x] + (1-blur_amount) * image.buffer[-y, x]
 
 
 # All models to be loaded
@@ -259,7 +287,7 @@ trueUp = Vector(0, 1, 0)
 
 startFrom = 0
 
-alpha = 0.0001
+alpha = 0.1
 
 while True:
 
@@ -353,6 +381,7 @@ while True:
 
 			Triangle(modelVerts[face[0]], modelVerts[face[1]], modelVerts[face[2]]).draw_faster(image, zBuffer)
 
+	depthOfField(image, zBuffer)
 	cv2.imshow("render", image.buffer)
 
 	# Reset image and z buffers
