@@ -10,6 +10,7 @@
 import zlib, struct
 import numpy as np
 import cv2
+import numbers
 
 class Color(object):
 	""" A small class representing a 32-bit RGBA color."""
@@ -46,6 +47,12 @@ class Color(object):
 		outB = int(self.b() * alpha) + int(destColor.b() * (1 - alpha))
 		outA = self.a() + int(destColor.a() * (1-alpha))
 		return Color(outR, outG, outB, outA)
+	
+	def __mul__(self, other):
+		""" Multiplies all color channel components by a value. """
+
+		if isinstance(other, numbers.Real):
+			return Color(self.color[0]*other, self.color[1]*other, self.color[2]*other, self.color[3])
 
 class Image(object):
 	""" An image class capable of generating and saving a PNG.

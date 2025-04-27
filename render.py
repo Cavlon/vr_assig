@@ -134,7 +134,7 @@ def handleOrientation(orientation):
 
 	return orientation, orientationInv
 
-def physicsPass(models, positions, velocities, friction = 0.98, radius = 0.4):
+def physicsPass(models, positions, velocities, friction = 0.98, radius = 0.45):
 	""" Models basic distance-based physics """
 	new_velocities = copy.deepcopy(velocities)
 
@@ -163,7 +163,7 @@ def physicsPass(models, positions, velocities, friction = 0.98, radius = 0.4):
 		velocities[i] = new_velocities[i] * friction
 		positions[i] = positions[i] + new_velocities[i]
 
-def depthOfField(image, z_buffer, near_plane=-1.5, far_plane=-3, max_dist=2, max_blur=1.5, blur_kernel=7):
+def depthOfField(image, z_buffer, near_plane=-1.5, far_plane=-3, max_dist=1, max_blur=1.2, blur_kernel=9):
 	""" Applies depth-of-field to the screen image """
 
 	# Compute the max-blurred image
@@ -190,6 +190,14 @@ def depthOfField(image, z_buffer, near_plane=-1.5, far_plane=-3, max_dist=2, max
 			# Update the pixel's colour as a weighted average using the blur amount as the weight
 			image.buffer[-y, x] = blur_amount * blurred_image[-y, x] + (1-blur_amount) * image.buffer[-y, x]
 
+# Colours for each model
+colours = [
+	Color(95, 141, 221, 255),
+	Color(255, 255, 255, 255),
+	Color(161, 196, 115, 255),
+	Color(169, 94, 196, 255),
+	Color(229, 91, 96, 255),
+]
 
 # All models to be loaded
 modelPaths = [
@@ -216,6 +224,7 @@ for i in range(len(modelPaths)):
 	models[i]['vertCount'] = vertCount
 	models[i]['faceCount'] = faceCount
 	models[i]['transformedVerts'] = [None] * vertCount
+	models[i]['colour'] = colours[i]
 	models[i]['transMatrix'] = None
 	models[i]['culledFaces'] = set()
 
@@ -287,7 +296,7 @@ trueUp = Vector(0, 1, 0)
 
 startFrom = 0
 
-alpha = 0.1
+alpha = 0.01
 
 while True:
 
@@ -352,7 +361,7 @@ while True:
 					intensity = 0
 				
 				projectedVert = getPerspectiveProjection(modelVerts[vertIndex])
-				modelVerts[vertIndex] = Point(projectedVert.x, projectedVert.y, projectedVert.z, Color(intensity*255, intensity*255, intensity*255, 255))
+				modelVerts[vertIndex] = Point(projectedVert.x, projectedVert.y, projectedVert.z, modelDict['colour'] * intensity)
 		else:
 			# Apply orientation quarternions and model matrix to vertices
 			for vertIndex in range(modelDict['vertCount']):
@@ -368,7 +377,7 @@ while True:
 				intensity = modelDict['vertIntensities'][vertIndex]
 
 				projectedVert = getPerspectiveProjection(modelVerts[vertIndex])
-				modelVerts[vertIndex] = Point(projectedVert.x, projectedVert.y, projectedVert.z, Color(intensity*255, intensity*255, intensity*255, 255))
+				modelVerts[vertIndex] = Point(projectedVert.x, projectedVert.y, projectedVert.z, modelDict['colour'] * intensity)
 
 		# Render the image iterating through faces
 		for j in range(modelDict['faceCount']):
